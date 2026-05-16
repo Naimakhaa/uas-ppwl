@@ -1,0 +1,35 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider   = "prisma-client"
+  output     = "../src/generated/prisma"
+  engineType = "client"
+  runtime    = "bun"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id             String   @id @default(cuid())
+  username       String   @unique
+  fullName       String
+  email          String   @unique // Wajib ditambahkan & harus unik untuk deteksi login
+  password       String?  // Ditambahkan opsional (?) untuk user register manual
+  bio            String?
+  avatarUrl      String?  // Sudah ada, pas untuk menyimpan foto profil Google
+  website        String?
+  postsCount     Int      @default(0)
+  followersCount Int      @default(0)
+  followingCount Int      @default(0)
+  
+  // Kolom Khusus Google OAuth (Tugas Kamu)
+  is_google      Boolean  @default(false) // Penanda login Google
+  google_id      String?  @unique         // Menyimpan ID unik dari Google
+
+  createdAt      DateTime @default(now())
+}

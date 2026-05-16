@@ -1,0 +1,271 @@
+# Monorepo - Docker
+Kenapa Docker?
+- Dedicated Environment: membungkus seluruh dependency  & config sesuai dengan aplikasi.
+- Karena monorepo memiliki berbagai kelompok stack workspace, kita bisa membungkus tiap workspace dengan docker agar lingkungan khusus yang sesuai dengan kebutuhan tiap workspace.
+
+Referensi yang berharga untuk mulai belajar docker:
+- [Docker Tutorial You Need To Get Started](https://youtu.be/DQdB7wFEygo?si=WKrwiZ1hT_G2EogT)
+- [The detailed intro to Docker started](https://youtu.be/Ud7Npgi6x8E?si=pntk0m4QedQfVJFB)
+
+## 0. Prerequisite
+- Selesaikan Fitur API Google Classroom yang ada di `monorepo-3.md`
+- **Install Docker CLI**: disarankan pakai Docker CLI tanpa Docker Desktop agar lebih ringan, tapi jika sudah install Docker Desktop tidak apa-apa karena sudah include Docker CLI. 
+    - Bagi pengguna windows yang bermasalah penyimpanan dan ingin setup Docker yang ringan, bisa [install WSL](https://learn.microsoft.com/en-us/windows/wsl/install) (disarankan pakai distro Arch Linux karena paling ringan), lalu di dalam WSL bisa [install Docker CLI](https://docs.docker.com/engine/install/) (Docker Engine).
+
+## 1. Setup Project
+Bagi pengguna WSL, disarankan copy project di path `mnt/c/` ke path `~` (home) di linux:
+```bash
+# Performa I/O di folder ~ (home) bisa 10x hingga 100x lebih cepat daripada di /mnt/c/
+cp -r /mnt/c/<path>/mono-docker ~/mono-docker
+cd ~/mono-docker
+code .
+```
+
+Struktur file baru:
+```
+mono-docker/
+├── docker-compose.yml    ← action untuk memanggil dockerfile
+├── .dockerignore         ← files yang tidak diperlukan saat build
+├── apps/             
+│   ├── backend/
+│   │   ├── Dockerfile    ← Setup docker (dependency, file transfer, & script command)
+│   │   └── prisma
+│   │       └──db.ts      ← modifikasi! perbaiki path
+│   └── frontend/
+│       ├── Dockerfile    ← Setup docker (dependency, file transfer, & script command) 
+│       └── nginx.conf    ← konfigurasi web untuk opsi static nginx (production)
+└── packages/
+    └── shared/
+```
+
+### 1.1. **docker-compose.yml**
+Konfigurasi linkungan utama docker project, berisi **name**, **services**, & **volumes**.
+```yml
+name: monorepo
+
+services:
+  backend:
+    build:
+      context: .                        # root = context supaya bisa akses packages/shared
+      dockerfile: apps/backend/Dockerfile
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: apps/frontend/Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  db_data:
+```
+
+### 1.2. **.dockerignore**
+File-file & folder yang di skip saat `Dockerfile` run `COPY`. Tidak diperlukan karena akan digenerate ulang di Docker.
+
+```bash
+node_modules
+**/node_modules
+**/dist
+dist
+**/build
+.git
+.bun-cache
+```
+
+### 1.3. **apps/backend/Dockerfile**
+- Build menggunakan template dari `oven/bun:1`
+- Copy file project ke dalam lingkungan virtual dari Docker, lalu run script 
+- Run script instalasi, Genereate, & runtime (sekarang pakai runtime server bun ke src/, anda bisa edit dengan run build dulu lalu pakai dist/)
+
+```Dockerfile
+FROM oven/bun:1 AS base
+WORKDIR /app
+
+# Copy workspace manifests dulu (layer caching)
+COPY package.json bun.lock ./
+COPY apps/backend/package.json ./apps/backend/
+COPY packages/shared/package.json ./packages/shared/
+
+RUN bun install
+
+# Copy source
+COPY apps/backend ./apps/backend
+COPY packages/shared ./packages/shared
+
+WORKDIR /app/apps/backend
+
+# Generate Prisma client
+RUN bunx prisma generate
+
+EXPOSE 3000
+CMD ["bun", "run", "src/index.ts"]
+```
+
+### 1.4. **apps/backend/prisma/db.ts**
+Modifikasi path db file. jika tidak didefinisi di env, fallback ke path absolute (development)
+```ts
+import { PrismaClient } from "../src/generated/prisma/client";
+import { PrismaLibSql } from "@prisma/adapter-libsql";
+import path from "path";
+
+const dbUrl = process.env.DATABASE_URL || `file:${path.resolve(__dirname, "../dev.db")}`;
+
+const adapter = new PrismaLibSql({ url: dbUrl, authToken: process.env.DB_AUTH_TOKEN });
+export const prisma = new PrismaClient({ adapter });
+```
+
+### 1.5. **apps/frontend/Dockerfile**
+- Build menggunakan template dari `oven/bun:1`
+- Copy file project ke dalam lingkungan virtual dari Docker, lalu run script 
+- Run script instalasi, Build, & runtime khusus.
+- runtime pakai `nginx:alpine` 
+
+```Dockerfile
+# Stage 1: build
+FROM oven/bun:1 AS builder
+WORKDIR /app
+
+COPY package.json bun.lock ./
+COPY apps/frontend/package.json ./apps/frontend/
+COPY packages/shared/package.json ./packages/shared/
+
+RUN bun install
+
+COPY apps/frontend ./apps/frontend
+COPY packages/shared ./packages/shared
+
+WORKDIR /app/apps/frontend
+
+RUN bun run build
+
+# Stage 2: serve dengan nginx
+FROM nginx:alpine
+COPY --from=builder /app/apps/frontend/dist /usr/share/nginx/html
+COPY apps/frontend/nginx.conf /etc/nginx/conf.d/default.conf
+
+CMD sh -c "echo '🦊 Frontend → http://localhost:5173' && nginx -g 'daemon off;'"
+
+EXPOSE 80
+```
+
+### 1.6. **apps/frontend/nginx.conf**
+konfigurasi untuk runtime `nginx` 
+```conf
+server {
+    listen 80;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # SPA fallback
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Proxy API calls ke backend container
+    location /api/ {
+        proxy_pass http://backend:3000/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
+```
+
+## 2. CLI
+Untuk pengguna WSL (handle issue):
+```bash
+# di wsl, untuk mengecek jaringan aman, jalankan: (jika pakai debian/ubuntu)
+sudo apt update
+# jika ada indikasi masalah IPv6 (Network is unreachable), kita paksa apt hanya menggunakan IPv4:
+sudo apt update -o Acquire::ForceIPv4=true
+# | Get:18 http://deb.debian.org/debian-security trixie-security/non-free-firmware .. [352 B]
+# | Fetched 16.9 MB in 3s (5,250 kB/s)
+# | All packages are up to date.
+# Jika dapat speed 5,250 kB/s tandanya sudah stabil
+
+# Untuk struktur file dependency berpindah dari Windows ke WSL (Linux)
+# Hapus sisa installasi dari windows path
+# Hapus node_modules secara rekursif
+find . -name "node_modules" -type d -prune -exec rm -rf '{}' +
+
+# Hapus file lock Bun
+rm -f bun.lock
+```
+
+Run ini untuk test hasil:
+```bash
+# install & test dulu development
+bun install
+bun dev
+
+# jika dev berhasil, sekarang Build image nya
+docker compose build
+## Jika build terkena Integrity check failed (karena docker pakai virtual network-nya sendiri),
+## Paksa Docker Build Menggunakan Network Host
+docker compose build --build-arg BUILDKIT_INLINE_CACHE=1
+
+# jalankan container berisi image yang di-build
+docker compose up
+# tekan 'd' untuk detached (docker container masih run di background)
+
+# untuk menutup container & membersihkan network
+docker compose down
+
+# ---- Issue/Error Handler ---
+# --- Build Cache not changed -> do "Hard Reset"
+# Jika dapat error ketika compose up, lalu kamu buat perubahan tapi ketika `compose up` kode tidak berubah, coba build tanpa cache.
+docker compose build --no-cache
+# tambahkan --build-arg <detail_arg> jika error Integrity check failed (asdos check berhasil build di 98.0s)
+docker compose build --no-cache --build-arg BUILDKIT_INLINE_CACHE=1
+# untuk lebih cepat, bisa build service yang error saja (cth: `backend`, nama di docker-compose.yml)
+docker compose build --no-cache backend --build-arg BUILDKIT_INLINE_CACHE=1
+
+# -> jalankan ulang container
+docker compose up
+
+# Jika masih error kode yang tidak berubah, Jalankan pembersihan "nuklir" 
+## 1. Matikan kontainer
+docker compose down
+## 2. Hapus cache build secara total (Sangat Penting!)
+docker builder prune -a -f
+## 3. Bangun ulang tanpa cache sama sekali (asumsi jika error perubahan kode di `backend`)
+docker compose build --no-cache backend
+## 4. Jalankan
+docker compose up backend
+
+# --- Port Used in Docker -> do "stop docker process that used the port"
+# jika dapat error port is already allocated
+# run ini untuk stop all docker process dari `compose up`
+docker ps -q | xargs docker stop
+
+# cek jika ada port yang running
+docker ps --format "table {{.Names}}\t{{.Ports}}"
+``` 
+
+### Fix error `bun dev`
+
+Jika dapat error `Port 5173 is already in use` walau sudah pakai `kill-port`, cukup ganti port nya jadi `5174`, dan sebaliknya. Atau pakai Powershell (run as administrator):
+```bash
+# lihat siapa yang memakai port 5173: 
+netstat -ano | findstr :5173
+
+# Jika muncul angka di kolom paling kanan (misal: 1234), matikan prosesnya:
+taskkill /F /PID 1234
+```
+
+---
+
+## Final
+Kumpulkan:
+1. **Link**: repo **`https://github.com/<username>/ppwl9-mono-docker`**
+2. **rekaman layar**: [Contoh Submisi Video](https://drive.google.com/file/d/1uBXGJSdh-ot5CfT8rrcAzjkXIFfsh4EL/view?usp=drive_link)
+    - menampilkan test web & perlihatkan command line hasil build docker nya, tutup terminal yang lain.
+    - Memastikan bahwa web yang terlihat adalah hasil build docker, bukan `bun dev` biasa.
+    - Test halaman root `/` (tampilkan tabel data) dan `/classroom` (grid data API Course) di web frontend.
