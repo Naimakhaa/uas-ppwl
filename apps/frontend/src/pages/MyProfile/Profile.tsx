@@ -1,149 +1,119 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, memo } from "react";
+import { useNavigate } from "react-router-dom";
+
+// ICONS
 import { IoMdGrid } from "react-icons/io";
 import { VscBookmark } from "react-icons/vsc";
 import { GiCog } from "react-icons/gi";
-import { FiVideoOff, FiLogOut } from "react-icons/fi";
+import { GoVerified } from "react-icons/go";
+import { FiVideoOff } from "react-icons/fi";
 
-// 1. Definisi Interface untuk TypeScript (Sesuai Kriteria Tugas)
-interface ProfileData {
-  username: string;
-  fullName: string;
-  bio: string;
-  avatarUrl: string;
-  postsCount: number;
-  followersCount: number;
-  followingCount: number;
-  website?: string;
-}
+const Profile: React.FC = () => {
+  const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<number>(0);
 
-const MyProfile: React.FC = () => {
-  // 2. State Management
-  const [profile, setProfile] = useState<ProfileData | null>(null);
-  const [activeTab, setActiveTab] = useState<number>(0); // 0: Grid, 1: Saved
-  const [loading, setLoading] = useState<boolean>(true);
+  const profile = {
+    username: "kharizma_rzkh",
+    fullName: "Riz Riz",
+    bio: "Eunoia ☀️✨\nDigital Enthusiast | Tech & Design",
+    avatarUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400",
+    postsCount: 3,
+    followersCount: 508,
+    followingCount: 505,
+    website: "https://untan.ac.id"
+  };
 
-  // 3. Integrasi Fetch ke Backend (Sesuai Kriteria Tugas Besar)
-  useEffect(() => {
-    const fetchProfile = async () => {
-      try {
-        // Ganti URL dengan endpoint backend Elysia-mu
-        const response = await fetch("http://localhost:3000/api/my-profile");
-        const data = await response.json();
-        setProfile(data);
-      } catch (error) {
-        console.error("Gagal mengambil data profil:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProfile();
-  }, []);
-
-  if (loading) return <div className="text-center mt-20">Memuat Profil...</div>;
+  const highlights = [
+    { name: "therapy", img: "https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=150" },
+    { name: "Sorotan", img: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" },
+    { name: "f", img: "https://images.unsplash.com/photo-1513885045260-6b3086b24c17?w=150" },
+    { name: "kuchingмy", img: "https://images.unsplash.com/photo-1514888286974-6c03e2ca1dba?w=150" }
+  ];
 
   return (
-    <section className="max-w-4xl mx-auto px-4 py-8 font-sans text-gray-900">
-      {/* --- HEADER SECTION --- */}
-      <header className="flex flex-col md:flex-row items-center md:items-start gap-8 mb-12">
-        {/* Avatar */}
-        <div className="w-20 h-20 md:w-40 md:h-40 rounded-full border-2 border-gray-200 overflow-hidden shrink-0">
-          <img 
-            src={profile?.avatarUrl || "https://via.placeholder.com/150"} 
-            alt="avatar" 
-            className="w-full h-full object-cover"
-          />
+    <div style={{ fontFamily: "Segoe UI, Roboto, Helvetica, Arial, sans-serif", color: "#262626", maxWidth: "935px", margin: "0 auto", padding: "30px 20px" }}>
+      
+      {/* HEADER SECTION */}
+      <header style={{ display: "flex", alignItems: "center", marginBottom: "44px", paddingLeft: "40px" }}>
+        {/* Lingkaran Avatar */}
+        <div style={{ width: "150px", height: "150px", borderRadius: "50%", overflow: "hidden", marginRight: "100px", border: "1px solid #dbdbdb", flexShrink: 0 }}>
+          <img src={profile.avatarUrl} alt="avatar" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
 
-        {/* Info & Actions */}
-        <div className="flex flex-col gap-5 w-full">
-          <div className="flex flex-wrap items-center justify-center md:justify-start gap-4">
-            <h2 className="text-xl font-light tracking-wide">{profile?.username}</h2>
-            <div className="flex gap-2">
-              <button className="bg-gray-100 hover:bg-gray-200 px-4 py-1.5 rounded-lg text-sm font-semibold transition">
-                Edit Profile
-              </button>
-              <button className="bg-gray-100 hover:bg-gray-200 p-2 rounded-lg transition md:hidden">
-                <FiLogOut />
-              </button>
-              <button className="p-1">
-                <GiCog className="text-2xl" />
-              </button>
-            </div>
+        {/* Info Detail */}
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px", flexGrow: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+            <h2 style={{ fontSize: "28px", fontWeight: "300", margin: 0, display: "flex", alignItems: "center", gap: "8px" }}>
+              {profile.username}
+              <GoVerified style={{ color: "#0095f6", fontSize: "18px" }} />
+            </h2>
+            <button onClick={() => navigate("/edit-profile")} style={{ backgroundColor: "#efefef", border: "none", borderRadius: "4px", padding: "5px 16px", fontSize: "14px", fontWeight: "600", cursor: "pointer" }}>
+              Edit Profile
+            </button>
+            <GiCog style={{ fontSize: "24px", cursor: "pointer" }} />
           </div>
 
-          {/* Statistik (Desktop) */}
-          <div className="hidden md:flex gap-10">
-            <span><strong>{profile?.postsCount}</strong> posts</span>
-            <span><strong>{profile?.followersCount}</strong> followers</span>
-            <span><strong>{profile?.followingCount}</strong> following</span>
+          <div style={{ display: "flex", gap: "40px", fontSize: "16px" }}>
+            <div><strong style={{ fontWeight: "600" }}>{profile.postsCount}</strong> posts</div>
+            <div><strong style={{ fontWeight: "600" }}>{profile.followersCount}</strong> followers</div>
+            <div><strong style={{ fontWeight: "600" }}>{profile.followingCount}</strong> following</div>
           </div>
 
-          {/* Bio */}
-          <div className="text-sm text-center md:text-left">
-            <h1 className="font-bold">{profile?.fullName}</h1>
-            <p className="whitespace-pre-line">{profile?.bio}</p>
-            {profile?.website && (
-              <a href={profile.website} target="_blank" className="text-blue-900 font-semibold block mt-1">
-                {profile.website.replace(/^https?:\/\//, "")}
-              </a>
-            )}
+          <div style={{ fontSize: "14px", lineHeight: "1.5" }}>
+            <h1 style={{ fontWeight: "600", margin: "0 0 4px 0" }}>{profile.fullName}</h1>
+            <p style={{ margin: 0, whiteSpace: "pre-line", color: "#262626" }}>{profile.bio}</p>
+            <a href={profile.website} target="_blank" rel="noreferrer" style={{ color: "#00376b", fontWeight: "600", textDecoration: "none" }}>
+              {profile.website.replace(/^(?:https?:\/\/|www\.)/i, "")}
+            </a>
           </div>
         </div>
       </header>
 
-      {/* Statistik (Mobile Only) */}
-      <div className="md:hidden flex justify-around border-t py-3 text-sm text-gray-500 mb-4">
-        <div className="text-center"><strong>{profile?.postsCount}</strong><br/>posts</div>
-        <div className="text-center"><strong>{profile?.followersCount}</strong><br/>followers</div>
-        <div className="text-center"><strong>{profile?.followingCount}</strong><br/>following</div>
-      </div>
-
-      {/* --- TABS SECTION --- */}
-      <div className="border-t border-gray-200">
-        <div className="flex justify-center gap-16">
-          <button 
-            onClick={() => setActiveTab(0)}
-            className={`flex items-center gap-2 py-4 text-xs font-bold tracking-widest uppercase transition-all border-t-2 ${
-              activeTab === 0 ? "border-black text-black" : "border-transparent text-gray-400"
-            }`}
-          >
-            <IoMdGrid className="text-lg" /> POSTS
-          </button>
-          <button 
-            onClick={() => setActiveTab(1)}
-            className={`flex items-center gap-2 py-4 text-xs font-bold tracking-widest uppercase transition-all border-t-2 ${
-              activeTab === 1 ? "border-black text-black" : "border-transparent text-gray-400"
-            }`}
-          >
-            <VscBookmark className="text-lg" /> SAVED
-          </button>
+      {/* HIGHLIGHTS / SOROTAN */}
+      <div style={{ display: "flex", gap: "28px", padding: "10px 0 30px 40px", borderBottom: "1px solid #dbdbdb", overflowX: "auto" }}>
+        {highlights.map((hl, i) => (
+          <div key={i} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", cursor: "pointer", flexShrink: 0 }}>
+            <div style={{ width: "77px", height: "77px", borderRadius: "50%", padding: "3px", border: "1px solid #dbdbdb", backgroundColor: "#fff" }}>
+              <img src={hl.img} alt={hl.name} style={{ width: "100%", height: "100%", borderRadius: "50%", objectFit: "cover" }} />
+            </div>
+            <span style={{ fontSize: "12px", fontWeight: "500" }}>{hl.name}</span>
+          </div>
+        ))}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px", cursor: "pointer" }}>
+          <div style={{ width: "77px", height: "77px", borderRadius: "50%", border: "1px solid #dbdbdb", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "30px", fontWeight: "100", color: "#c7c7c7" }}>+</div>
+          <span style={{ fontSize: "12px", color: "#8e8e8e" }}>New</span>
         </div>
       </div>
 
-      {/* --- CONTENT SECTION --- */}
-      <div className="mt-4">
+      {/* TABS LAYER */}
+      <div style={{ display: "flex", justifyContent: "center", gap: "60px", marginBottom: "20px" }}>
+        <button onClick={() => setActiveTab(0)} style={{ background: "none", border: "none", borderTop: activeTab === 0 ? "1px solid #262626" : "1px solid transparent", color: activeTab === 0 ? "#262626" : "#8e8e8e", padding: "12px 0", fontSize: "12px", fontWeight: "600", letterSpacing: "1px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+          <IoMdGrid style={{ fontSize: "16px" }} /> POSTS
+        </button>
+        <button onClick={() => setActiveTab(1)} style={{ background: "none", border: "none", borderTop: activeTab === 1 ? "1px solid #262626" : "1px solid transparent", color: activeTab === 1 ? "#262626" : "#8e8e8e", padding: "12px 0", fontSize: "12px", fontWeight: "600", letterSpacing: "1px", cursor: "pointer", display: "flex", alignItems: "center", gap: "6px" }}>
+          <VscBookmark style={{ fontSize: "16px" }} /> SAVED
+        </button>
+      </div>
+
+      {/* GRID LAYOUT POSTINGAN */}
+      <div>
         {activeTab === 0 ? (
-          /* Grid Postingan (Jika Kosong) */
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-            <div className="rounded-full border-2 border-black p-4 mb-4">
-              <FiVideoOff className="text-4xl" />
-            </div>
-            <h2 className="text-3xl font-extrabold">Share Photos</h2>
-            <p className="text-gray-500 mt-2">When you share photos, they will appear on your profile.</p>
-            <button className="text-blue-500 font-bold mt-4 hover:text-blue-700">Share your first photo</button>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "28px" }}>
+            <div style={{ aspectRatio: "1/1", backgroundColor: "#fafafa", border: "1px solid #dbdbdb" }}><img src="https://images.unsplash.com/photo-1501854140801-50d01698950b?w=400" style={{ width: "100%", height: "100%", objectFit: "cover" }} alt=""/></div>
+            <div style={{ aspectRatio: "1/1", backgroundColor: "#fafafa", border: "1px solid #dbdbdb" }}><img src="https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400" style={{ width: "100%", height: "100%", objectFit: "cover" }} alt=""/></div>
+            <div style={{ aspectRatio: "1/1", backgroundColor: "#fafafa", border: "1px solid #dbdbdb" }}><img src="https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=400" style={{ width: "100%", height: "100%", objectFit: "cover" }} alt=""/></div>
           </div>
         ) : (
-          /* Saved Posts (Jika Kosong) */
-          <div className="flex flex-col items-center justify-center py-20 text-center">
-             <VscBookmark className="text-6xl text-gray-300 mb-4" />
-             <h2 className="text-2xl font-bold">Save</h2>
-             <p className="max-w-xs text-gray-500 mt-2">Save photos and videos that you want to see again.</p>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "60px 0", textAlign: "center" }}>
+            <FiVideoOff style={{ fontSize: "62px", color: "#262626", marginBottom: "16px" }} />
+            <h2 style={{ fontSize: "28px", fontWeight: "800", margin: "0 0 10px 0" }}>Photos of you</h2>
+            <p style={{ color: "#8e8e8e", fontSize: "14px", margin: 0 }}>When people tag you in photos, they'll appear here.</p>
           </div>
         )}
       </div>
-    </section>
+
+    </div>
   );
 };
 
-export default MyProfile;
+export default memo(Profile);

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuthStore } from '@/stores/auth.store'; // Import Zustand store
 import { toast } from 'sonner'; // Import Sonner dari ShadCN
 
@@ -14,7 +14,42 @@ export default function Login({ onLoginSuccess }: LoginProps) {
   const [isLoading, setIsLoading] = useState(false);
 
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const setAuth = useAuthStore((state) => state.setAuth); 
+
+  // ==========================================
+  // OTOMATISASI PASCA-LOGIN GOOGLE OAUTH
+  // ==========================================
+  useEffect(() => {
+    // Menangkap token & data user yang dikirim backend lewat URL (misal: ?token=abc&id=123)
+    const token = searchParams.get('token');
+    const id = searchParams.get('id');
+    const name = searchParams.get('name');
+    const email = searchParams.get('email');
+    const avatarUrl = searchParams.get('avatarUrl');
+
+    if (token && id && name && email) {
+      // Masukkan ke State Management Zustand
+      setAuth(
+        {
+          id: id,
+          name: name,
+          email: email,
+          avatarUrl: avatarUrl || 'https://via.placeholder.com/150',
+        },
+        token
+      );
+
+      toast.success(`Selamat datang, ${name}! 👋`, {
+        description: 'Anda berhasil masuk menggunakan Google.',
+        duration: 4000,
+      });
+
+      if (onLoginSuccess) onLoginSuccess();
+      navigate('/'); // Lempar ke beranda, tidak akan mental lagi
+    }
+  }, [searchParams, setAuth, navigate, onLoginSuccess]);
+  // ==========================================
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

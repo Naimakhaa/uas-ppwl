@@ -1,62 +1,37 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { Toaster } from 'sonner';
-import { useAuthStore } from '@/stores/auth.store'; // Pastikan path import store Zustand kamu sudah benar
-import Profile from "./pages/MyProfile/Profile";
+
+// IMPORT HALAMAN LOGIN
+import Sidebar from "./components/ui/Sidebar";
 import Login from './pages/Login/Login';
+import EditProfile from "./pages/EditProfile/EditProfile";
 
-// Komponen Proteksi Route (Mencegah user yang belum login masuk ke /profile)
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const user = useAuthStore((state) => state.user);
-  return user ? <>{children}</> : <Navigate to="/login" replace />;
-}
+// ========================================================
+// IMPORT HALAMAN PROFIL SECARA AMAN (MENGHINDARI EROR 500)
+// ========================================================
+import * as ProfileModule from "./pages/MyProfile/Profile";
 
-// Komponen Pembatas Login (Mencegah user yang SUDAH login kembali ke halaman /login)
-function AuthRoute({ children }: { children: React.ReactNode }) {
-  const user = useAuthStore((state) => state.user);
-  return !user ? <>{children}</> : <Navigate to="/profile" replace />;
-}
+// Deteksi otomatis apakah kelompokmu pakai export default atau named export (MyProfile)
+const ProfileComponent = 
+  ProfileModule.default || 
+  (ProfileModule as any).MyProfile || 
+  (() => (
+    <div className="p-10 text-center">
+      <h1 className="text-xl font-bold text-red-500">Gagal Memuat Komponen Profil</h1>
+      <p className="text-gray-500">Pastikan file /src/pages/MyProfile/Profile.tsx ada dan namanya benar.</p>
+    </div>
+  ));
+// ========================================================
 
 export default function App() {
-  const setAuth = useAuthStore((state) => state.setAuth);
-  const user = useAuthStore((state) => state.user);
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
 
   useEffect(() => {
-    // Jalankan pengecekan session ke backend Elysia hanya jika di Zustand user-nya masih kosong
-    if (!user) {
-      fetch('http://localhost:3000/api/my-profile', { 
-        credentials: 'include' // KRUSIAL: Agar cookie session Google ikut dikirim oleh browser
-      })
-        .then((res) => {
-          if (res.ok) return res.json();
-          throw new Error('Belum terautentikasi / Guest');
-        })
-        .then((data) => {
-          // Sinkronisasikan data user dari database ke Zustand store
-          setAuth(
-            {
-              id: data.id,
-              name: data.name,
-              email: data.email,
-              avatarUrl: data.avatarUrl || 'https://via.placeholder.com/150',
-            },
-            'session-cookie-active' 
-          );
-        })
-        .catch(() => {
-          console.log('User mengakses sebagai tamu (belum login).');
-        })
-        .finally(() => {
-          // Matikan loading screen setelah pengecekan selesai
-          setIsCheckingAuth(false);
-        });
-    } else {
-      setIsCheckingAuth(false);
-    }
-  }, [user, setAuth]);
+    // Matikan loading screen agar langsung masuk ke rute halaman
+    setIsCheckingAuth(false);
+  }, []);
 
-  // Tampilkan loading screen sederhana saat aplikasi sedang mencocokkan cookie data Google kamu
   if (isCheckingAuth) {
     return (
       <div className="w-screen h-screen flex flex-col items-center justify-center bg-white">
@@ -71,18 +46,29 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <div className="w-screen min-h-screen flex items-center justify-center bg-[#fafafa]">
+      {/* Catatan: w-screen dan items-center/justify-center dihilangkan dari div pembungkus utama 
+        agar halaman edit-profile & profile bisa mengisi layar ke kanan dengan fleksibel mengikuti layout Sidebar.
+      */}
+      <div className="w-full min-h-screen bg-[#fafafa]">
         <Routes>
-          {/* Halaman / dan /login akan otomatis mengusir user ke /profile jika sudah login */}
-          <Route path="/" element={<AuthRoute><Login /></AuthRoute>} />
-          <Route path="/login" element={<AuthRoute><Login /></AuthRoute>} />
+          {/* Halaman Login berdiri sendiri tanpa Sidebar */}
+          <Route path="/" element={<Login />} />
+          <Route path="/login" element={<Login />} />
           
-          {/* Halaman /profile diproteksi, wajib login dulu baru bisa dibuka */}
-          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          {/* ================================================================
+            STRUKTUR BERSARANG (NESTED ROUTES)
+            Komponen Sidebar dijadikan INDUK agar selalu muncul di kiri layar.
+            ================================================================
+          */}
+          <Route element={<Sidebar />}>
+            {/* Halaman-halaman di bawah ini otomatis akan merender Sidebar di kirinya */}
+            <Route path="/profile" element={<ProfileComponent />} />
+            <Route path="/edit-profile" element={<EditProfile />} />
+          </Route>
+
         </Routes>
       </div>
 
-      {/* Taruh Toaster di sini agar popup Sonner-nya bisa muncul secara global */}
       <Toaster position="top-center" richColors />
     </BrowserRouter>
   );
